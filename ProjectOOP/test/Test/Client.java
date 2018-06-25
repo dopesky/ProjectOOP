@@ -15,7 +15,8 @@ import java.net.*;
 public class Client {
 
         public static void main(String[] args) throws IOException {
-                int filesize = 1022386;
+                //reads over 658MB per loop
+                int filesize = 691000000;
                 int bytesRead;
                 int currentTot = 0;
                 Socket socket = new Socket("10.51.36.132", 15123);
