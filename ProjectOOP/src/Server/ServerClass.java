@@ -59,7 +59,7 @@ public class ServerClass {
         /**
          * The constructor.
          */
-        public ServerClass() throws IOException, SecurityException, IllegalBlockingModeException, AWTException {
+        public ServerClass() throws IOException,SocketException ,SecurityException, IllegalBlockingModeException, AWTException,BindException,ConnectException,Throwable {
                 socket = new ServerSocket(15132);
                 System.out.println("Waiting for connection... ");
                 client = socket.accept();
@@ -80,7 +80,7 @@ public class ServerClass {
          * Receive an info file from the client in form of a byte array which is
          * stored in <code>bytearray</code>
          */
-        private void receiveInfoByte() throws IOException {
+        private void receiveInfoByte() throws IOException,SocketException {
                 InputStream is = client.getInputStream();
                 bytesRead = is.read(bytearray, 0, bytearray.length);
                 currentTot = bytesRead;
@@ -95,7 +95,7 @@ public class ServerClass {
         /**
          * Read the info <code>bytearray</code> into a string array
          */
-        private void readInfoByte() throws IOException {
+        private void readInfoByte() throws IOException,SocketException {
                 FileOutputStream fos = new FileOutputStream("receive.txt");
                 BufferedOutputStream bos = new BufferedOutputStream(fos);
                 bos.write(bytearray, 0, currentTot);
@@ -193,13 +193,15 @@ public class ServerClass {
                         } else if (answer == 1) {
                                 receiveInfo.close();
                         }
-                } catch (IOException ioe) {}
+                } catch (Throwable ioe) {
+                        JOptionPane.showMessageDialog(null,ioe,"Error in Transfer of File",JOptionPane.ERROR_MESSAGE);
+                }
         }
 
         /**
          * The main function.
          */
-        public static void main(String args[]) throws IOException, SocketException, IllegalBlockingModeException, AWTException {
+        public static void main(String args[])throws IOException,SocketException ,SecurityException, IllegalBlockingModeException, AWTException,BindException,ConnectException,Throwable {
                 try {
                         UIManager.setLookAndFeel(new DarculaLaf());
                 } catch (UnsupportedLookAndFeelException ulaf) {
