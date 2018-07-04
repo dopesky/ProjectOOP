@@ -59,7 +59,7 @@ public class ServerClass {
         /**
          * The constructor.
          */
-        public ServerClass() throws IOException,SocketException ,SecurityException, IllegalBlockingModeException, AWTException,BindException,ConnectException,Throwable {
+        public ServerClass() throws IOException, SocketException, SecurityException, IllegalBlockingModeException, AWTException, BindException, ConnectException, Throwable {
                 socket = new ServerSocket(15132);
                 System.out.println("Waiting for connection... ");
                 client = socket.accept();
@@ -80,7 +80,7 @@ public class ServerClass {
          * Receive an info file from the client in form of a byte array which is
          * stored in <code>bytearray</code>
          */
-        private void receiveInfoByte() throws IOException,SocketException {
+        private void receiveInfoByte() throws IOException, SocketException {
                 InputStream is = client.getInputStream();
                 bytesRead = is.read(bytearray, 0, bytearray.length);
                 currentTot = bytesRead;
@@ -95,7 +95,7 @@ public class ServerClass {
         /**
          * Read the info <code>bytearray</code> into a string array
          */
-        private void readInfoByte() throws IOException,SocketException {
+        private void readInfoByte() throws IOException, SocketException {
                 FileOutputStream fos = new FileOutputStream("receive.txt");
                 BufferedOutputStream bos = new BufferedOutputStream(fos);
                 bos.write(bytearray, 0, currentTot);
@@ -158,7 +158,9 @@ public class ServerClass {
                                         }
                                 } catch (InterruptedException ie) {
                                         SystemTray.getSystemTray().remove(notify);
-                                        if(notify.selected!=-1) receiveFile(notify.selected);
+                                        if (notify.selected != -1) {
+                                                receiveFile(notify.selected);
+                                        }
                                 }
                         }
                 }.start();
@@ -168,7 +170,7 @@ public class ServerClass {
          * method to receive or refuse receiving of file
          */
         private void receiveFile(int answer) {
-                try{
+                try {
                         Socket receiveInfo = new Socket(InetAddress.getByName(fileData[2].trim()), 15133);
                         InputStream is = receiveInfo.getInputStream();
                         if (answer == 0) {
@@ -194,18 +196,48 @@ public class ServerClass {
                                 receiveInfo.close();
                         }
                 } catch (Throwable ioe) {
-                        JOptionPane.showMessageDialog(null,ioe,"Error in Transfer of File",JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(null, ioe, "Error in Transfer of File", JOptionPane.ERROR_MESSAGE);
                 }
         }
 
         /**
          * The main function.
          */
-        public static void main(String args[])throws IOException,SocketException ,SecurityException, IllegalBlockingModeException, AWTException,BindException,ConnectException,Throwable {
+        public static void main(String args[]) {
                 try {
                         UIManager.setLookAndFeel(new DarculaLaf());
                 } catch (UnsupportedLookAndFeelException ulaf) {
                 }
-                new ServerClass();
+                try {
+                        new ServerClass();
+                } catch (Throwable th) {
+                        try {
+                                if (SystemTray.isSupported()) {
+                                        ImageIcon getImage = new ImageIcon("");
+                                        Image imageIcon = getImage.getImage();
+
+                                        Notifications notify = new Notifications(imageIcon, "Errors");
+                                        notify.displayTray("Error", th.toString(), TrayIcon.MessageType.ERROR);
+                                        new Thread() {
+                                                @Override
+                                                public void run() {
+                                                        int counter = 1;
+                                                        try {
+                                                                while (true) {
+                                                                        Thread.sleep(1000);
+                                                                        counter++;
+                                                                        if (counter >= 10) {
+                                                                                this.interrupt();
+                                                                        }
+                                                                }
+                                                        } catch (InterruptedException ie) {
+                                                                SystemTray.getSystemTray().remove(notify);
+                                                        }
+                                                }
+                                        }.start();
+                                }
+                        } catch (Exception e) {
+                        }
+                }
         }
 }
