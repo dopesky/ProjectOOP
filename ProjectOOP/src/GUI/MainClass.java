@@ -15,7 +15,7 @@ public class MainClass {
          * @param args the command line arguments
          */
         public static void main(String[] args) throws Throwable {
-                Client.ClientClass client = new Client.ClientClass("127.0.0.1", "test/testing.mp3");
+                Client.ClientClass client = new Client.ClientClass("10.55.62.181", "test/The.Big.Bang.Theory.S11E04.The.Explosion.Implosion.720p.WEB-DL.x264.AAC.mp4");
 
         }
 
