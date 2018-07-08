@@ -84,6 +84,7 @@ public class ServerClass {
                 InputStream is = client.getInputStream();
                 bytesRead = is.read(bytearray, 0, bytearray.length);
                 currentTot = bytesRead;
+                System.out.println("Receiving info byte.");
                 do {
                         bytesRead = is.read(bytearray, currentTot, (bytearray.length - currentTot));
                         if (bytesRead >= 0) {
@@ -98,6 +99,7 @@ public class ServerClass {
         private void readInfoByte() throws IOException, SocketException {
                 FileOutputStream fos = new FileOutputStream("receive.txt");
                 BufferedOutputStream bos = new BufferedOutputStream(fos);
+                System.out.println("Reading info byte into temporary receive file.");
                 bos.write(bytearray, 0, currentTot);
                 bos.flush();
                 bos.close();
@@ -118,6 +120,7 @@ public class ServerClass {
                 for (rows = 0; temp.hasNext(); rows++) {
                         temp.nextLine();
                 }
+                System.out.println("Reading receive.txt file into fileData array.");
                 fileData = new String[rows];
 
                 temp = new Scanner(new FileInputStream("receive.txt"));
@@ -126,6 +129,7 @@ public class ServerClass {
                 }
                 temp.close();
                 inputStream.close();
+                System.out.println("Deleting temporary file.");
                 tempFile.delete();
         }
 
@@ -133,6 +137,7 @@ public class ServerClass {
          * Send a notification from the server
          */
         private void sendNotification() throws AWTException {
+                System.out.println("Sending Notification.");
                 ImageIcon getImage = new ImageIcon(getClass().getResource("/Resources/lolo0073.png"));
                 Image imageIcon = getImage.getImage();
 
@@ -146,6 +151,7 @@ public class ServerClass {
                         public void run() {
                                 int counter = 1;
                                 try {
+                                        System.out.println("Waiting for user to deny or accept file.");
                                         while (true) {
                                                 Thread.sleep(1000);
                                                 counter++;
@@ -160,6 +166,8 @@ public class ServerClass {
                                         SystemTray.getSystemTray().remove(notify);
                                         if (notify.selected != -1) {
                                                 receiveFile(notify.selected);
+                                        } else {
+                                                System.out.println("Took too long to respond. Closing connection.");
                                         }
                                 }
                         }
@@ -171,10 +179,16 @@ public class ServerClass {
          */
         private void receiveFile(int answer) {
                 try {
+                        System.out.println("Connecting to client " + fileData[2].trim() + " to receive file " + fileData[1] + " on port 15133.");
                         Socket receiveInfo = new Socket(InetAddress.getByName(fileData[2].trim()), 15133);
                         InputStream is = receiveInfo.getInputStream();
                         if (answer == 0) {
+                                System.out.println("File Accepted.\nReceiving file...");
                                 int fileSize = Integer.parseInt(fileData[0].trim());
+                                if (fileSize > 691000000) {
+                                        receiveLargeFiles(is,receiveInfo);
+                                        return;
+                                }
                                 bytearray = new byte[filesize];
                                 bytesRead = is.read(bytearray, 0, bytearray.length);
                                 currentTot = bytesRead;
@@ -183,6 +197,7 @@ public class ServerClass {
                                         if (bytesRead >= 0) {
                                                 currentTot += bytesRead;
                                         }
+                                        System.out.println(currentTot+" bytes read in total.");
                                 } while (bytesRead > -1);
 
                                 FileOutputStream fos = new FileOutputStream(fileData[1]);
@@ -192,12 +207,33 @@ public class ServerClass {
                                 bos.close();
                                 fos.close();
                                 receiveInfo.close();
+                                System.out.println("File receipt complete.");
                         } else if (answer == 1) {
+                                System.out.println("File Rejected. Closing connection");
                                 receiveInfo.close();
                         }
                 } catch (Throwable ioe) {
-                        JOptionPane.showMessageDialog(null, ioe, "Error in Transfer of File", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(null, ioe.getMessage(), "Error in Transfer of File", JOptionPane.ERROR_MESSAGE);
+                        ioe.printStackTrace();
                 }
+        }
+
+        private void receiveLargeFiles(InputStream socket,Socket receiver) throws IOException, SocketException {
+                FileOutputStream fos = new FileOutputStream(fileData[1]);
+                BufferedOutputStream bos = new BufferedOutputStream(fos);
+                bytearray = new byte[filesize];
+                
+                do {
+                        bytesRead = socket.read(bytearray, 0, bytearray.length);
+                        currentTot+=bytesRead;
+                        System.out.println(currentTot+" bytes read in total.");
+                        if(bytesRead>-1)bos.write(bytearray, 0, bytesRead);
+                } while (bytesRead>-1);
+                bos.flush();
+                bos.close();
+                fos.close();
+                receiver.close();
+                System.out.println("File receipt complete.");
         }
 
         /**
@@ -207,11 +243,13 @@ public class ServerClass {
                 try {
                         UIManager.setLookAndFeel(new DarculaLaf());
                 } catch (UnsupportedLookAndFeelException ulaf) {
+                        ulaf.printStackTrace();
                 }
                 try {
                         new ServerClass();
                 } catch (Throwable th) {
                         try {
+                                th.printStackTrace();
                                 if (SystemTray.isSupported()) {
                                         ImageIcon getImage = new ImageIcon("");
                                         Image imageIcon = getImage.getImage();
@@ -236,7 +274,8 @@ public class ServerClass {
                                                 }
                                         }.start();
                                 }
-                        } catch (Exception e) {
+                        } catch (Throwable e) {
+                                e.printStackTrace();
                         }
                 }
         }

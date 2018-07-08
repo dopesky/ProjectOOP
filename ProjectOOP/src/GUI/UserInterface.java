@@ -37,6 +37,21 @@ public class UserInterface extends javax.swing.JFrame {
         DBUtils database;
         ResultSet set;
         String username, password;
+        Server.ServerClass server;
+
+        Runnable serverThread = new Runnable() {
+                @Override
+                public void run() {
+                        try {
+                                server = new Server.ServerClass();
+                        } catch (Throwable th) {
+                                displayJOptionPane(th.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                        btnServer.setSelected(false);
+                }
+        };
+        
+        Thread startServer=new Thread(serverThread);
 
         /**
          * Creates new form UserInterface
@@ -77,7 +92,7 @@ public class UserInterface extends javax.swing.JFrame {
         }
 
         private void connectToDatabase() {
-                database = new DBUtils("jdbc:mysql://192.168.0.14/filesharingoop", "root", "biggie5941");
+                database = new DBUtils("jdbc:mysql://10.51.40.228/filesharingoop", "root", "biggie5941");
                 if (!database.isConnectionSuccessful) {
                         displayJOptionPane("Unable to connect to database.", "Error", JOptionPane.ERROR_MESSAGE);
                         System.exit(0);
@@ -356,6 +371,9 @@ public class UserInterface extends javax.swing.JFrame {
                 btnMinimizeCreate = new javax.swing.JButton();
                 panelCreate = new javax.swing.JPanel();
                 lblCreate = new javax.swing.JLabel();
+                chooser = new javax.swing.JFileChooser();
+                jScrollPane1 = new javax.swing.JScrollPane();
+                jTextArea1 = new javax.swing.JTextArea();
                 btnMin = new javax.swing.JButton();
                 jButton2 = new javax.swing.JButton();
                 btnIconMain = new javax.swing.JButton();
@@ -819,11 +837,21 @@ public class UserInterface extends javax.swing.JFrame {
                 frameCreate.getContentPane().add(lblCreate);
                 lblCreate.setBounds(0, 0, 840, 330);
 
+                chooser.setApproveButtonText("Send");
+                chooser.setFileHidingEnabled(true);
+
                 setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
                 setUndecorated(true);
                 setResizable(false);
                 setSize(new java.awt.Dimension(915, 380));
                 getContentPane().setLayout(null);
+
+                jTextArea1.setColumns(20);
+                jTextArea1.setRows(5);
+                jScrollPane1.setViewportView(jTextArea1);
+
+                getContentPane().add(jScrollPane1);
+                jScrollPane1.setBounds(220, 30, 680, 330);
 
                 btnMin.setBackground(new java.awt.Color(0, 0, 0));
                 btnMin.setFont(new java.awt.Font("Palatino Linotype", 3, 12)); // NOI18N
@@ -886,6 +914,11 @@ public class UserInterface extends javax.swing.JFrame {
                 btnSend.setText("Send File");
                 btnSend.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
                 btnSend.setFocusable(false);
+                btnSend.addActionListener(new java.awt.event.ActionListener() {
+                        public void actionPerformed(java.awt.event.ActionEvent evt) {
+                                btnSendActionPerformed(evt);
+                        }
+                });
 
                 btnSlide.setBackground(new java.awt.Color(0, 0, 0));
                 btnSlide.setFont(new java.awt.Font("Palatino Linotype", 3, 16)); // NOI18N
@@ -907,6 +940,11 @@ public class UserInterface extends javax.swing.JFrame {
                 btnLogout.setText("Log Out");
                 btnLogout.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
                 btnLogout.setFocusable(false);
+                btnLogout.addActionListener(new java.awt.event.ActionListener() {
+                        public void actionPerformed(java.awt.event.ActionEvent evt) {
+                                btnLogoutActionPerformed(evt);
+                        }
+                });
 
                 btnServer.setBackground(new java.awt.Color(0, 0, 0));
                 btnServer.setFont(new java.awt.Font("Palatino Linotype", 3, 16)); // NOI18N
@@ -914,6 +952,11 @@ public class UserInterface extends javax.swing.JFrame {
                 btnServer.setText("Server is Off");
                 btnServer.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
                 btnServer.setFocusable(false);
+                btnServer.addActionListener(new java.awt.event.ActionListener() {
+                        public void actionPerformed(java.awt.event.ActionEvent evt) {
+                                btnServerActionPerformed(evt);
+                        }
+                });
 
                 btnBroadcast.setBackground(new java.awt.Color(0, 0, 0));
                 btnBroadcast.setFont(new java.awt.Font("Palatino Linotype", 3, 16)); // NOI18N
@@ -978,8 +1021,8 @@ public class UserInterface extends javax.swing.JFrame {
                         if (set.next()) {
                                 String temp = set.getObject(3).toString();
                                 if (temp.equals(password)) {
-                                        String newMac=getMacAddress();
-                                        database.execute("update users set macaddress='"+newMac+"' where username='"+username+"'");
+                                        String newMac = getMacAddress();
+                                        database.execute("update users set macaddress='" + newMac + "' where username='" + username + "'");
                                         txtUserName.setText("");
                                         txtPassword.setText("");
                                         frameLogin.setVisible(false);
@@ -1284,6 +1327,35 @@ public class UserInterface extends javax.swing.JFrame {
                 setState(ICONIFIED);
         }//GEN-LAST:event_btnMinActionPerformed
 
+        private void btnServerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnServerActionPerformed
+                try {
+                        if (btnServer.isSelected()) {
+                                btnServer.setText("Server is on");
+                                startServer.start();
+                        } else {
+                                btnServer.setSelected(true);
+                        }
+                } catch (Throwable th) {
+                        displayJOptionPane(th.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
+        }//GEN-LAST:event_btnServerActionPerformed
+
+        private void btnLogoutActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnLogoutActionPerformed
+                setVisible(false);
+                frameLogin.setVisible(true);
+                txtUserName.requestFocus();
+        }//GEN-LAST:event_btnLogoutActionPerformed
+
+        private void btnSendActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSendActionPerformed
+                chooser.showOpenDialog(null);
+                File file=chooser.getSelectedFile();
+                try{
+                Client.ClientClass tp=new Client.ClientClass("10.51.8.218",file.getAbsolutePath());
+                }catch(Throwable e){
+                        displayJOptionPane(e.getMessage(),"Error",JOptionPane.ERROR_MESSAGE);
+                }
+        }//GEN-LAST:event_btnSendActionPerformed
+
         /**
          * @param args the command line arguments
          */
@@ -1339,6 +1411,7 @@ public class UserInterface extends javax.swing.JFrame {
         private javax.swing.JToggleButton btnServer;
         private javax.swing.JButton btnSlide;
         private javax.swing.JButton btnshowhide;
+        private javax.swing.JFileChooser chooser;
         private javax.swing.JFrame frameAbout;
         private javax.swing.JFrame frameCreate;
         private javax.swing.JFrame frameLogin;
@@ -1351,6 +1424,8 @@ public class UserInterface extends javax.swing.JFrame {
         private javax.swing.JLabel jLabel6;
         private javax.swing.JPanel jPanel1;
         private javax.swing.JPanel jPanel2;
+        private javax.swing.JScrollPane jScrollPane1;
+        private javax.swing.JTextArea jTextArea1;
         private javax.swing.JLabel lblAboutBackground;
         private javax.swing.JLabel lblBackGround1;
         private javax.swing.JLabel lblBackGround2;
