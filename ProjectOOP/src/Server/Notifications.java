@@ -66,7 +66,7 @@ public class Notifications extends TrayIcon {
                 Notifications notify=new Notifications(temp,"Receive File");
                 notify.addActionListener();
                 notify.setPopupMenu();
-                notify.displayTray("I was here","I want to fuck", TrayIcon.MessageType.NONE);
+                notify.displayTray("I was here","I want", TrayIcon.MessageType.NONE);
         }
         
 }
