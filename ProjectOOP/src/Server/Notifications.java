@@ -1,7 +1,6 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/**
+ * There exists no licence for this product. One may do with it 
+ * as they please.
  */
 package Server;
 
