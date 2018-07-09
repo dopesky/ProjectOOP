@@ -16,7 +16,6 @@ public class MainClass {
          */
         public static void main(String[] args) throws Throwable {
                 Client.ClientClass client = new Client.ClientClass("127.0.0.1","test/ubuntu-16.04.3-desktop-i386.iso");
-
         }
 
 }
