@@ -7,13 +7,14 @@ package GUI;
 
 import AppPackage.AnimationClass;
 import Class.*;
-import com.bulenkov.darcula.DarculaLaf;
+import com.bulenkov.darcula.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
 import java.sql.*;
 import java.util.*;
+import java.util.zip.*;
 import javax.swing.*;
 import javax.swing.border.BevelBorder;
 import javazoom.jl.player.*;
@@ -27,31 +28,40 @@ public class UserInterface extends javax.swing.JFrame {
         final AnimationClass anime = new AnimationClass();
         private boolean capsIsOn;
         private boolean fileNotFound = false;
-        private Point compCords = null;
+        private Point compCords = null, frameCords = null;
         Player audio;
         private boolean isCompleted = true;
         private boolean musicFound = true;
         private Scanner About;
         private String aboutContent = "";
-        private int counter = 0;
         DBUtils database;
         ResultSet set;
         String username, password;
         Server.ServerClass server;
+        private static int notifications = 1;
+        private String currentDir = "c:\\Users\\" + System.getProperty("user.name") + "\\Desktop";
 
         Runnable serverThread = new Runnable() {
                 @Override
                 public void run() {
                         try {
-                                server = new Server.ServerClass();
+                                ProcessBuilder builder = new ProcessBuilder(new String[]{"cmd.exe", "/c", "cd c:\\users\\kevin\\desktop\\javaapps\\projectoop\\projectoop\\build\\classes && java -cp c:\\users\\kevin\\desktop\\javaapps\\projectoop\\projectoop\\dist\\lib\\darcula.jar; Server.ServerClass " + notifications});
+                                builder.redirectErrorStream(true);
+                                Process process = builder.start();
+                                Scanner in = new Scanner(process.getInputStream());
+                                while (in.hasNextLine()) {
+                                        System.out.println(in.nextLine());
+                                }
                         } catch (Throwable th) {
                                 displayJOptionPane(th.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                         }
                         btnServer.setSelected(false);
+                        btnServer.setText("Server is Off");
+                        startServer = new Thread(serverThread);
                 }
         };
-        
-        Thread startServer=new Thread(serverThread);
+
+        Thread startServer = new Thread(serverThread);
 
         /**
          * Creates new form UserInterface
@@ -92,7 +102,7 @@ public class UserInterface extends javax.swing.JFrame {
         }
 
         private void connectToDatabase() {
-                database = new DBUtils("jdbc:mysql://10.51.40.228/filesharingoop", "root", "biggie5941");
+                database = new DBUtils("jdbc:mysql://localhost/filesharingoop", "root", "biggie5941");
                 if (!database.isConnectionSuccessful) {
                         displayJOptionPane("Unable to connect to database.", "Error", JOptionPane.ERROR_MESSAGE);
                         System.exit(0);
@@ -321,6 +331,76 @@ public class UserInterface extends javax.swing.JFrame {
                 return macString;
         }
 
+        private ArrayList<String> readFolderRecursively(File folder) {
+                ArrayList<String> list = new ArrayList<>();
+                for (File file : folder.listFiles()) {
+                        list.add(file.getPath());
+                        if (file.isDirectory()) {
+                                for (String inner : readFolderRecursively(file)) {
+                                        list.add(inner);
+                                }
+                        }
+                }
+                return list;
+        }
+
+        private int showOpenDialog() {
+                chooser.setFileFilter(chooser.getAcceptAllFileFilter());
+                chooser.setCurrentDirectory(new File(currentDir));
+                chooser.setSelectedFile(new File(""));
+                return chooser.showOpenDialog(null);
+        }
+
+        private File getZipFile(File[] selections) throws IOException {
+                File zip = new File("sendFiles.zip");
+                byte[] buffer = new byte[691000000];
+                FileOutputStream output = new FileOutputStream(zip);
+                ZipOutputStream zipper = new ZipOutputStream(output);
+                for (File file : selections) {
+                        System.out.println(file.getName());
+                        FileInputStream reader;
+                        if (file.isDirectory()) {
+                                ArrayList<String> directoryFiles = readFolderRecursively(file);
+                                for (String directoryFile : directoryFiles) {
+                                        File dFile = new File(directoryFile);
+                                        if (dFile.isFile()) {
+                                                reader = new FileInputStream(directoryFile);
+                                                String entryName = directoryFile.substring(directoryFile.indexOf(file.getName()));
+                                                ZipEntry dEntry = new ZipEntry(entryName);
+                                                zipper.putNextEntry(dEntry);
+
+                                                int read;
+                                                do {
+                                                        read = reader.read(buffer, 0, buffer.length);
+                                                        if (read > -1) {
+                                                                zipper.write(buffer, 0, read);
+                                                        }
+                                                } while (read > -1);
+                                                reader.close();
+                                                zipper.closeEntry();
+                                        }
+                                }
+                                continue;
+                        }
+                        reader = new FileInputStream(file);
+                        ZipEntry entry = new ZipEntry(file.getName());
+                        zipper.putNextEntry(entry);
+
+                        int read;
+                        do {
+                                read = reader.read(buffer, 0, buffer.length);
+                                if (read > -1) {
+                                        zipper.write(buffer, 0, read);
+                                }
+                        } while (read > -1);
+                        reader.close();
+                        zipper.closeEntry();
+                }
+                zipper.close();
+                output.close();
+                return zip;
+        }
+
         /**
          * This method is called from within the constructor to initialize the
          * form. WARNING: Do NOT modify this code. The content of this method is
@@ -377,7 +457,7 @@ public class UserInterface extends javax.swing.JFrame {
                 btnMin = new javax.swing.JButton();
                 jButton2 = new javax.swing.JButton();
                 btnIconMain = new javax.swing.JButton();
-                jPanel1 = new javax.swing.JPanel();
+                panelMain = new javax.swing.JPanel();
                 jPanel2 = new javax.swing.JPanel();
                 btnSend = new javax.swing.JButton();
                 btnSlide = new javax.swing.JButton();
@@ -551,6 +631,7 @@ public class UserInterface extends javax.swing.JFrame {
                 panelTop.setBackground(new java.awt.Color(0, 0, 0));
                 panelTop.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.LOWERED, new java.awt.Color(102, 0, 0), new java.awt.Color(0, 153, 0), new java.awt.Color(102, 0, 0), new java.awt.Color(0, 204, 0)), "User Login", javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Monotype Corsiva", 1, 14), new java.awt.Color(0, 204, 0))); // NOI18N
                 panelTop.setForeground(new java.awt.Color(51, 51, 55));
+                panelTop.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
                 panelTop.setOpaque(false);
                 panelTop.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
                         public void mouseDragged(java.awt.event.MouseEvent evt) {
@@ -632,6 +713,7 @@ public class UserInterface extends javax.swing.JFrame {
                 panelAbout.setBackground(new Color(0,0,0,64));
                 panelAbout.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED, new java.awt.Color(51, 0, 0), new java.awt.Color(153, 0, 153), new java.awt.Color(51, 0, 0), new java.awt.Color(255, 0, 255)), "About", javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Monotype Corsiva", 1, 14), new java.awt.Color(255, 51, 153))); // NOI18N
                 panelAbout.setForeground(new Color(0,0,0,64));
+                panelAbout.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
                 panelAbout.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
                         public void mouseDragged(java.awt.event.MouseEvent evt) {
                                 panelAboutMouseDragged(evt);
@@ -827,7 +909,21 @@ public class UserInterface extends javax.swing.JFrame {
 
                 panelCreate.setBackground(new Color(0,0,0,64));
                 panelCreate.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.LOWERED, new java.awt.Color(0, 51, 204), new java.awt.Color(102, 0, 0), new java.awt.Color(153, 0, 0), new java.awt.Color(0, 0, 102)), "Create Account", javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Monotype Corsiva", 1, 13), new java.awt.Color(0, 102, 255))); // NOI18N
+                panelCreate.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
                 panelCreate.setOpaque(false);
+                panelCreate.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+                        public void mouseDragged(java.awt.event.MouseEvent evt) {
+                                panelCreateMouseDragged(evt);
+                        }
+                });
+                panelCreate.addMouseListener(new java.awt.event.MouseAdapter() {
+                        public void mousePressed(java.awt.event.MouseEvent evt) {
+                                panelCreateMousePressed(evt);
+                        }
+                        public void mouseReleased(java.awt.event.MouseEvent evt) {
+                                panelCreateMouseReleased(evt);
+                        }
+                });
                 panelCreate.setLayout(null);
                 frameCreate.getContentPane().add(panelCreate);
                 panelCreate.setBounds(30, 0, 780, 30);
@@ -838,7 +934,13 @@ public class UserInterface extends javax.swing.JFrame {
                 lblCreate.setBounds(0, 0, 840, 330);
 
                 chooser.setApproveButtonText("Send");
+                chooser.setApproveButtonToolTipText("Click to send selected files.");
+                chooser.setCurrentDirectory(new java.io.File("C:\\Users"));
+                chooser.setDialogTitle("Select files to Send");
                 chooser.setFileHidingEnabled(true);
+                chooser.setFileSelectionMode(javax.swing.JFileChooser.FILES_AND_DIRECTORIES);
+                chooser.setFont(new java.awt.Font("Palatino Linotype", 3, 16)); // NOI18N
+                chooser.setMultiSelectionEnabled(true);
 
                 setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
                 setUndecorated(true);
@@ -887,25 +989,39 @@ public class UserInterface extends javax.swing.JFrame {
                 getContentPane().add(btnIconMain);
                 btnIconMain.setBounds(0, 0, 30, 30);
 
-                jPanel1.setBackground(new Color(0,0,0,64));
-                jPanel1.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.LOWERED, new java.awt.Color(153, 0, 0), new java.awt.Color(153, 153, 153), new java.awt.Color(102, 0, 0), new java.awt.Color(204, 204, 204)), "Main", javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Monotype Corsiva", 1, 13), new java.awt.Color(153, 0, 0))); // NOI18N
-                jPanel1.setOpaque(false);
+                panelMain.setBackground(new Color(0,0,0,64));
+                panelMain.setBorder(javax.swing.BorderFactory.createTitledBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.LOWERED, new java.awt.Color(153, 0, 0), new java.awt.Color(153, 153, 153), new java.awt.Color(102, 0, 0), new java.awt.Color(204, 204, 204)), "Main", javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Monotype Corsiva", 1, 13), new java.awt.Color(153, 0, 0))); // NOI18N
+                panelMain.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+                panelMain.setOpaque(false);
+                panelMain.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+                        public void mouseDragged(java.awt.event.MouseEvent evt) {
+                                panelMainMouseDragged(evt);
+                        }
+                });
+                panelMain.addMouseListener(new java.awt.event.MouseAdapter() {
+                        public void mousePressed(java.awt.event.MouseEvent evt) {
+                                panelMainMousePressed(evt);
+                        }
+                        public void mouseReleased(java.awt.event.MouseEvent evt) {
+                                panelMainMouseReleased(evt);
+                        }
+                });
 
-                javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
-                jPanel1.setLayout(jPanel1Layout);
-                jPanel1Layout.setHorizontalGroup(
-                        jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                javax.swing.GroupLayout panelMainLayout = new javax.swing.GroupLayout(panelMain);
+                panelMain.setLayout(panelMainLayout);
+                panelMainLayout.setHorizontalGroup(
+                        panelMainLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                         .addGap(0, 838, Short.MAX_VALUE)
                 );
-                jPanel1Layout.setVerticalGroup(
-                        jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                panelMainLayout.setVerticalGroup(
+                        panelMainLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                         .addGap(0, 0, Short.MAX_VALUE)
                 );
 
-                getContentPane().add(jPanel1);
-                jPanel1.setBounds(36, 0, 850, 30);
+                getContentPane().add(panelMain);
+                panelMain.setBounds(36, 0, 850, 30);
 
-                jPanel2.setBackground(new Color(0,0,0,64));
+                jPanel2.setBackground(new java.awt.Color(51, 51, 51));
                 jPanel2.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED, new java.awt.Color(153, 0, 0), new java.awt.Color(102, 102, 102), new java.awt.Color(153, 0, 0), new java.awt.Color(153, 153, 153)));
 
                 btnSend.setBackground(new java.awt.Color(0, 0, 0));
@@ -995,11 +1111,11 @@ public class UserInterface extends javax.swing.JFrame {
                                 .addComponent(btnBroadcast)
                                 .addGap(19, 19, 19)
                                 .addComponent(btnLogout)
-                                .addContainerGap(13, Short.MAX_VALUE))
+                                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 );
 
                 getContentPane().add(jPanel2);
-                jPanel2.setBounds(0, 33, 210, 348);
+                jPanel2.setBounds(0, 33, 210, 325);
 
                 lblBackground.setBackground(new java.awt.Color(0, 0, 0));
                 lblBackground.setOpaque(true);
@@ -1021,8 +1137,8 @@ public class UserInterface extends javax.swing.JFrame {
                         if (set.next()) {
                                 String temp = set.getObject(3).toString();
                                 if (temp.equals(password)) {
-                                        String newMac = getMacAddress();
-                                        database.execute("update users set macaddress='" + newMac + "' where username='" + username + "'");
+//                                        String newMac = getMacAddress();
+//                                        database.execute("update users set macaddress='" + newMac + "' where username='" + username + "'");
                                         txtUserName.setText("");
                                         txtPassword.setText("");
                                         frameLogin.setVisible(false);
@@ -1038,6 +1154,9 @@ public class UserInterface extends javax.swing.JFrame {
                                 txtPassword.setText("");
                                 txtUserName.requestFocus();
                         }
+                } catch (NullPointerException npe) {
+                        displayJOptionPane("You are not connected to the internet.\nExiting...", "Error", JOptionPane.ERROR_MESSAGE);
+                        System.exit(0);
                 } catch (Exception sqle) {
                         displayJOptionPane(sqle.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                 }
@@ -1127,16 +1246,18 @@ public class UserInterface extends javax.swing.JFrame {
         }//GEN-LAST:event_btnIconActionPerformed
 
         private void panelTopMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelTopMouseDragged
-                Point currentCords = evt.getLocationOnScreen();
-                frameLogin.setLocation(currentCords.x - compCords.x, currentCords.y - compCords.y);
+                Point currentCords = new Point(evt.getXOnScreen(), evt.getYOnScreen());
+                frameLogin.setLocation(currentCords.x - compCords.x + frameCords.x, currentCords.y - compCords.y + frameCords.y);
         }//GEN-LAST:event_panelTopMouseDragged
 
         private void panelTopMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelTopMousePressed
-                compCords = evt.getPoint();
+                compCords = new Point(evt.getXOnScreen(), evt.getYOnScreen());
+                frameCords = new Point(frameLogin.getX(), frameLogin.getY());
         }//GEN-LAST:event_panelTopMousePressed
 
         private void panelTopMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelTopMouseReleased
                 compCords = null;
+                frameCords = null;
         }//GEN-LAST:event_panelTopMouseReleased
 
         private void btnReplayActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnReplayActionPerformed
@@ -1165,15 +1286,17 @@ public class UserInterface extends javax.swing.JFrame {
 
         private void panelAboutMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelAboutMouseDragged
                 Point currentCords = evt.getLocationOnScreen();
-                frameAbout.setLocation(currentCords.x - compCords.x, currentCords.y - compCords.y);
+                frameAbout.setLocation(currentCords.x - compCords.x + frameCords.x, currentCords.y - compCords.y + frameCords.y);
         }//GEN-LAST:event_panelAboutMouseDragged
 
         private void panelAboutMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelAboutMousePressed
-                compCords = evt.getPoint();
+                compCords = evt.getLocationOnScreen();
+                frameCords = new Point(frameAbout.getX(), frameAbout.getY());
         }//GEN-LAST:event_panelAboutMousePressed
 
         private void panelAboutMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelAboutMouseReleased
                 compCords = null;
+                frameCords = null;
         }//GEN-LAST:event_panelAboutMouseReleased
 
         private void btnIconCreateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnIconCreateActionPerformed
@@ -1331,7 +1454,12 @@ public class UserInterface extends javax.swing.JFrame {
                 try {
                         if (btnServer.isSelected()) {
                                 btnServer.setText("Server is on");
-                                startServer.start();
+                                new Thread() {
+                                        @Override
+                                        public void run() {
+                                                startServer.start();
+                                        }
+                                }.start();
                         } else {
                                 btnServer.setSelected(true);
                         }
@@ -1347,14 +1475,48 @@ public class UserInterface extends javax.swing.JFrame {
         }//GEN-LAST:event_btnLogoutActionPerformed
 
         private void btnSendActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSendActionPerformed
-                chooser.showOpenDialog(null);
-                File file=chooser.getSelectedFile();
-                try{
-                Client.ClientClass tp=new Client.ClientClass("10.51.8.218",file.getAbsolutePath());
-                }catch(Throwable e){
-                        displayJOptionPane(e.getMessage(),"Error",JOptionPane.ERROR_MESSAGE);
+                int choice = showOpenDialog();
+                File[] files = chooser.getSelectedFiles();
+                if (files.length < 1 || choice != JFileChooser.APPROVE_OPTION) {
+                        return;
+                }
+                try {
+                        File zipFile=getZipFile(files);
+                        Client.ClientClass sendFile=new Client.ClientClass("127.0.0.1",zipFile.getAbsolutePath());
+                } catch (Throwable th) {
+                        displayJOptionPane(th.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                 }
         }//GEN-LAST:event_btnSendActionPerformed
+
+        private void panelCreateMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelCreateMouseDragged
+                Point currentCords = evt.getLocationOnScreen();
+                frameCreate.setLocation(currentCords.x - compCords.x + frameCords.x, currentCords.y - compCords.y + frameCords.y);
+        }//GEN-LAST:event_panelCreateMouseDragged
+
+        private void panelCreateMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelCreateMousePressed
+                compCords = evt.getLocationOnScreen();
+                frameCords = new Point(frameCreate.getX(), frameCreate.getY());
+        }//GEN-LAST:event_panelCreateMousePressed
+
+        private void panelCreateMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelCreateMouseReleased
+                compCords = null;
+                frameCords = null;
+        }//GEN-LAST:event_panelCreateMouseReleased
+
+        private void panelMainMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelMainMouseDragged
+                Point currentCords = evt.getLocationOnScreen();
+                setLocation(currentCords.x - compCords.x + frameCords.x, currentCords.y - compCords.y + frameCords.y);
+        }//GEN-LAST:event_panelMainMouseDragged
+
+        private void panelMainMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelMainMousePressed
+                compCords = evt.getLocationOnScreen();
+                frameCords = new Point(getX(), getY());
+        }//GEN-LAST:event_panelMainMousePressed
+
+        private void panelMainMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelMainMouseReleased
+                compCords = null;
+                frameCords = null;
+        }//GEN-LAST:event_panelMainMouseReleased
 
         /**
          * @param args the command line arguments
@@ -1376,13 +1538,9 @@ public class UserInterface extends javax.swing.JFrame {
                 }
                 //</editor-fold>
 
-                //</editor-fold>
-
                 /* Create and display the form */
-                java.awt.EventQueue.invokeLater(new Runnable() {
-                        public void run() {
-                                new UserInterface();
-                        }
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                        UserInterface temp = new UserInterface();
                 });
         }
 
@@ -1422,7 +1580,6 @@ public class UserInterface extends javax.swing.JFrame {
         private javax.swing.JLabel jLabel4;
         private javax.swing.JLabel jLabel5;
         private javax.swing.JLabel jLabel6;
-        private javax.swing.JPanel jPanel1;
         private javax.swing.JPanel jPanel2;
         private javax.swing.JScrollPane jScrollPane1;
         private javax.swing.JTextArea jTextArea1;
@@ -1435,6 +1592,7 @@ public class UserInterface extends javax.swing.JFrame {
         private javax.swing.JLabel lblWelcome;
         private javax.swing.JPanel panelAbout;
         private javax.swing.JPanel panelCreate;
+        private javax.swing.JPanel panelMain;
         private javax.swing.JPanel panelTop;
         private javax.swing.JScrollPane scrlAbout;
         private javax.swing.JTextArea txtAreaAbout;

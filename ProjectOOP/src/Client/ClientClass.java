@@ -95,6 +95,7 @@ public class ClientClass {
                         recepient.close();
                         fin.close();
                         bin.close();
+                        sendingServer.close();
                         System.out.println("File transfer complete!!");
                         System.out.println("Thankyou");
                 } catch (SocketTimeoutException stoe) {
@@ -124,6 +125,7 @@ public class ClientClass {
                 recepient.close();
                 fin.close();
                 bin.close();
+                sendingServer.close();
                 System.out.println("File transfer complete!!");
                 System.out.println("Thankyou");
         }
