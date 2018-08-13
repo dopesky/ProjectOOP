@@ -7,14 +7,15 @@ package GUI;
 
 import AppPackage.AnimationClass;
 import Class.*;
+import ZipFiles.Zipper;
 import com.bulenkov.darcula.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
+import java.nio.channels.IllegalBlockingModeException;
 import java.sql.*;
 import java.util.*;
-import java.util.zip.*;
 import javax.swing.*;
 import javax.swing.border.BevelBorder;
 import javazoom.jl.player.*;
@@ -39,15 +40,16 @@ public class UserInterface extends javax.swing.JFrame {
         String username, password;
         Server.ServerClass server;
         private static int notifications = 1;
-        private String currentDir = "c:\\Users\\" + System.getProperty("user.name") + "\\Desktop";
+        private final String currentDir = "c:\\Users\\" + System.getProperty("user.name") + "\\Desktop";
+        private Process process=null;
 
         Runnable serverThread = new Runnable() {
                 @Override
                 public void run() {
                         try {
-                                ProcessBuilder builder = new ProcessBuilder(new String[]{"cmd.exe", "/c", "cd c:\\users\\kevin\\desktop\\javaapps\\projectoop\\projectoop\\build\\classes && java -cp c:\\users\\kevin\\desktop\\javaapps\\projectoop\\projectoop\\dist\\lib\\darcula.jar; Server.ServerClass " + notifications});
+                                ProcessBuilder builder = new ProcessBuilder(new String[]{"cmd.exe", "/c", "cd c:\\users\\"+System.getProperty("user.name")+"\\desktop\\javaapps\\projectoop\\projectoop\\build\\classes && java -cp c:\\users\\"+System.getProperty("user.name")+"\\desktop\\javaapps\\projectoop\\projectoop\\dist\\lib\\darcula.jar; Server.ServerClass " + notifications});
                                 builder.redirectErrorStream(true);
-                                Process process = builder.start();
+                                process = builder.start();
                                 Scanner in = new Scanner(process.getInputStream());
                                 while (in.hasNextLine()) {
                                         System.out.println(in.nextLine());
@@ -62,6 +64,26 @@ public class UserInterface extends javax.swing.JFrame {
         };
 
         Thread startServer = new Thread(serverThread);
+        
+        Runnable clientThread=new Runnable() {
+            @Override
+            public void run(){
+                int choice = showOpenDialog();
+                File[] files = chooser.getSelectedFiles();
+                if (files.length < 1 || choice != JFileChooser.APPROVE_OPTION) {
+                        return;
+                }
+                try {
+                        Zipper zipper=new Zipper(files);
+                        Client.ClientClass sendFile=new Client.ClientClass("192.168.43.27",username,zipper.zipUp().getAbsolutePath());
+                } catch (IOException | SecurityException | IllegalBlockingModeException th) {
+                        displayJOptionPane(th.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
+                startClient=new Thread(clientThread);
+            }
+        };
+        
+        Thread startClient=new Thread(clientThread);
 
         /**
          * Creates new form UserInterface
@@ -102,9 +124,19 @@ public class UserInterface extends javax.swing.JFrame {
         }
 
         private void connectToDatabase() {
-                database = new DBUtils("jdbc:mysql://localhost/filesharingoop", "root", "biggie5941");
+                try {
+                        UIManager.setLookAndFeel(new DarculaLaf());
+                        database = new DBUtils("jdbc:mysql://localhost/filesharingoop", "root", "biggie5941");
+                        for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+                                if ("Nimbus".equals(info.getName())) {
+                                        javax.swing.UIManager.setLookAndFeel(info.getClassName());
+                                        break;
+                                }
+                        }
+                } catch (Throwable th) {
+                        database = new DBUtils("jdbc:mysql://localhost/filesharingoop", "root", "biggie5941");
+                }
                 if (!database.isConnectionSuccessful) {
-                        displayJOptionPane("Unable to connect to database.", "Error", JOptionPane.ERROR_MESSAGE);
                         System.exit(0);
                 }
         }
@@ -320,7 +352,7 @@ public class UserInterface extends javax.swing.JFrame {
                 return false;
         }
 
-        private String getMacAddress() throws Exception {
+        private String getMacAddress() throws SocketException,UnknownHostException {
                 InetAddress localhost = InetAddress.getLocalHost();
                 NetworkInterface Interface = NetworkInterface.getByInetAddress(localhost);
                 byte[] mac = Interface.getHardwareAddress();
@@ -331,74 +363,11 @@ public class UserInterface extends javax.swing.JFrame {
                 return macString;
         }
 
-        private ArrayList<String> readFolderRecursively(File folder) {
-                ArrayList<String> list = new ArrayList<>();
-                for (File file : folder.listFiles()) {
-                        list.add(file.getPath());
-                        if (file.isDirectory()) {
-                                for (String inner : readFolderRecursively(file)) {
-                                        list.add(inner);
-                                }
-                        }
-                }
-                return list;
-        }
-
         private int showOpenDialog() {
                 chooser.setFileFilter(chooser.getAcceptAllFileFilter());
                 chooser.setCurrentDirectory(new File(currentDir));
                 chooser.setSelectedFile(new File(""));
                 return chooser.showOpenDialog(null);
-        }
-
-        private File getZipFile(File[] selections) throws IOException {
-                File zip = new File("sendFiles.zip");
-                byte[] buffer = new byte[691000000];
-                FileOutputStream output = new FileOutputStream(zip);
-                ZipOutputStream zipper = new ZipOutputStream(output);
-                for (File file : selections) {
-                        System.out.println(file.getName());
-                        FileInputStream reader;
-                        if (file.isDirectory()) {
-                                ArrayList<String> directoryFiles = readFolderRecursively(file);
-                                for (String directoryFile : directoryFiles) {
-                                        File dFile = new File(directoryFile);
-                                        if (dFile.isFile()) {
-                                                reader = new FileInputStream(directoryFile);
-                                                String entryName = directoryFile.substring(directoryFile.indexOf(file.getName()));
-                                                ZipEntry dEntry = new ZipEntry(entryName);
-                                                zipper.putNextEntry(dEntry);
-
-                                                int read;
-                                                do {
-                                                        read = reader.read(buffer, 0, buffer.length);
-                                                        if (read > -1) {
-                                                                zipper.write(buffer, 0, read);
-                                                        }
-                                                } while (read > -1);
-                                                reader.close();
-                                                zipper.closeEntry();
-                                        }
-                                }
-                                continue;
-                        }
-                        reader = new FileInputStream(file);
-                        ZipEntry entry = new ZipEntry(file.getName());
-                        zipper.putNextEntry(entry);
-
-                        int read;
-                        do {
-                                read = reader.read(buffer, 0, buffer.length);
-                                if (read > -1) {
-                                        zipper.write(buffer, 0, read);
-                                }
-                        } while (read > -1);
-                        reader.close();
-                        zipper.closeEntry();
-                }
-                zipper.close();
-                output.close();
-                return zip;
         }
 
         /**
@@ -459,12 +428,12 @@ public class UserInterface extends javax.swing.JFrame {
                 btnIconMain = new javax.swing.JButton();
                 panelMain = new javax.swing.JPanel();
                 jPanel2 = new javax.swing.JPanel();
-                btnSend = new javax.swing.JButton();
                 btnSlide = new javax.swing.JButton();
                 btnChange = new javax.swing.JButton();
                 btnLogout = new javax.swing.JButton();
                 btnServer = new javax.swing.JToggleButton();
                 btnBroadcast = new javax.swing.JToggleButton();
+                btnSend = new javax.swing.JToggleButton();
                 lblBackground = new javax.swing.JLabel();
 
                 frameLogin.setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -872,11 +841,6 @@ public class UserInterface extends javax.swing.JFrame {
                 btnCreate.setBounds(420, 240, 110, 37);
 
                 btnIconCreate.setBackground(new java.awt.Color(0, 0, 0));
-                btnIconCreate.addActionListener(new java.awt.event.ActionListener() {
-                        public void actionPerformed(java.awt.event.ActionEvent evt) {
-                                btnIconCreateActionPerformed(evt);
-                        }
-                });
                 frameCreate.getContentPane().add(btnIconCreate);
                 btnIconCreate.setBounds(0, 0, 30, 30);
 
@@ -937,7 +901,6 @@ public class UserInterface extends javax.swing.JFrame {
                 chooser.setApproveButtonToolTipText("Click to send selected files.");
                 chooser.setCurrentDirectory(new java.io.File("C:\\Users"));
                 chooser.setDialogTitle("Select files to Send");
-                chooser.setFileHidingEnabled(true);
                 chooser.setFileSelectionMode(javax.swing.JFileChooser.FILES_AND_DIRECTORIES);
                 chooser.setFont(new java.awt.Font("Palatino Linotype", 3, 16)); // NOI18N
                 chooser.setMultiSelectionEnabled(true);
@@ -1024,18 +987,6 @@ public class UserInterface extends javax.swing.JFrame {
                 jPanel2.setBackground(new java.awt.Color(51, 51, 51));
                 jPanel2.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED, new java.awt.Color(153, 0, 0), new java.awt.Color(102, 102, 102), new java.awt.Color(153, 0, 0), new java.awt.Color(153, 153, 153)));
 
-                btnSend.setBackground(new java.awt.Color(0, 0, 0));
-                btnSend.setFont(new java.awt.Font("Palatino Linotype", 3, 16)); // NOI18N
-                btnSend.setForeground(new java.awt.Color(153, 0, 0));
-                btnSend.setText("Send File");
-                btnSend.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-                btnSend.setFocusable(false);
-                btnSend.addActionListener(new java.awt.event.ActionListener() {
-                        public void actionPerformed(java.awt.event.ActionEvent evt) {
-                                btnSendActionPerformed(evt);
-                        }
-                });
-
                 btnSlide.setBackground(new java.awt.Color(0, 0, 0));
                 btnSlide.setFont(new java.awt.Font("Palatino Linotype", 3, 16)); // NOI18N
                 btnSlide.setForeground(new java.awt.Color(153, 0, 0));
@@ -1081,6 +1032,16 @@ public class UserInterface extends javax.swing.JFrame {
                 btnBroadcast.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
                 btnBroadcast.setFocusable(false);
 
+                btnSend.setBackground(new java.awt.Color(0, 0, 0));
+                btnSend.setFont(new java.awt.Font("Palatino Linotype", 3, 16)); // NOI18N
+                btnSend.setForeground(new java.awt.Color(153, 0, 0));
+                btnSend.setText("Send");
+                btnSend.addActionListener(new java.awt.event.ActionListener() {
+                        public void actionPerformed(java.awt.event.ActionEvent evt) {
+                                btnSendActionPerformed(evt);
+                        }
+                });
+
                 javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
                 jPanel2.setLayout(jPanel2Layout);
                 jPanel2Layout.setHorizontalGroup(
@@ -1088,19 +1049,19 @@ public class UserInterface extends javax.swing.JFrame {
                         .addGroup(jPanel2Layout.createSequentialGroup()
                                 .addContainerGap()
                                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addComponent(btnSend, javax.swing.GroupLayout.DEFAULT_SIZE, 194, Short.MAX_VALUE)
                                         .addComponent(btnSlide, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                        .addComponent(btnChange, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(btnChange, javax.swing.GroupLayout.DEFAULT_SIZE, 186, Short.MAX_VALUE)
                                         .addComponent(btnLogout, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                         .addComponent(btnServer, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                        .addComponent(btnBroadcast, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                        .addComponent(btnBroadcast, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(btnSend, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                                 .addContainerGap())
                 );
                 jPanel2Layout.setVerticalGroup(
                         jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                         .addGroup(jPanel2Layout.createSequentialGroup()
                                 .addContainerGap()
-                                .addComponent(btnSend)
+                                .addComponent(btnSend, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addGap(18, 18, 18)
                                 .addComponent(btnSlide)
                                 .addGap(18, 18, 18)
@@ -1137,8 +1098,7 @@ public class UserInterface extends javax.swing.JFrame {
                         if (set.next()) {
                                 String temp = set.getObject(3).toString();
                                 if (temp.equals(password)) {
-//                                        String newMac = getMacAddress();
-//                                        database.execute("update users set macaddress='" + newMac + "' where username='" + username + "'");
+//                                        database.execute("update users set macaddress='" + getMacAddress() + "' where username='" + username + "'");
                                         txtUserName.setText("");
                                         txtPassword.setText("");
                                         frameLogin.setVisible(false);
@@ -1171,9 +1131,7 @@ public class UserInterface extends javax.swing.JFrame {
         private void btnCancelKeyPressed(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_btnCancelKeyPressed
                 switch (evt.getKeyCode()) {
                         case KeyEvent.VK_ENTER:
-                                txtUserName.setText("");
-                                txtPassword.setText("");
-                                txtUserName.requestFocus();
+                                btnCancel.doClick();
                                 break;
                         case KeyEvent.VK_ESCAPE:
                                 System.exit(0);
@@ -1222,24 +1180,20 @@ public class UserInterface extends javax.swing.JFrame {
                         frameCreate.setVisible(true);
                         txtUname.requestFocus();
                 });
-                about.addActionListener(new ActionListener() {
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                                if (!fileNotFound) {
-                                        frameLogin.setVisible(false);
-                                        frameAbout.setVisible(true);
-                                        movePane();
-                                } else {
-                                        displayJOptionPane("\"About\" file cannot be found", "Error", JOptionPane.ERROR_MESSAGE);
-                                }
+                about.addActionListener((ActionEvent e) -> {
+                        if (!fileNotFound) {
+                                frameLogin.setVisible(false);
+                                frameAbout.setVisible(true);
+                                movePane();
+                        } else {
+                                displayJOptionPane("\"About\" file cannot be found", "Error", JOptionPane.ERROR_MESSAGE);
                         }
                 });
                 aob.addActionListener((ActionEvent e) -> {
                         if (Desktop.isDesktopSupported()) {
                                 try {
                                         Desktop.getDesktop().browse(new URI("www.localhost/phpmyadmin/index.php"));
-                                } catch (Exception exe) {
-                                }
+                                } catch (IOException | URISyntaxException exe) {}
                         }
                 });
                 icon.show(btnIcon, 5, btnIcon.getHeight());
@@ -1299,10 +1253,6 @@ public class UserInterface extends javax.swing.JFrame {
                 frameCords = null;
         }//GEN-LAST:event_panelAboutMouseReleased
 
-        private void btnIconCreateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnIconCreateActionPerformed
-                // TODO add your handling code here:
-        }//GEN-LAST:event_btnIconCreateActionPerformed
-
         private void btnMinimizeCreateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnMinimizeCreateActionPerformed
                 frameCreate.setState(ICONIFIED);
         }//GEN-LAST:event_btnMinimizeCreateActionPerformed
@@ -1357,8 +1307,7 @@ public class UserInterface extends javax.swing.JFrame {
                                 txtPassRe.requestFocus();
                                 return;
                         }
-                        boolean available = checkUser(user);
-                        if (available) {
+                        if (checkUser(user)) {
                                 displayJOptionPane("User already exists", "Error", JOptionPane.ERROR_MESSAGE);
                                 txtUname.setText("");
                                 txtUname.requestFocus();
@@ -1376,8 +1325,8 @@ public class UserInterface extends javax.swing.JFrame {
                                 frameCreate.setVisible(false);
                                 frameLogin.setVisible(true);
                                 txtUserName.setText(user);
-                                txtUserName.requestFocus();
-                        } catch (Exception e) {
+                                txtPassword.requestFocus();
+                        } catch (SocketException | UnknownHostException | SQLException e) {
                                 displayJOptionPane(e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                         }
                 }
@@ -1453,7 +1402,7 @@ public class UserInterface extends javax.swing.JFrame {
         private void btnServerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnServerActionPerformed
                 try {
                         if (btnServer.isSelected()) {
-                                btnServer.setText("Server is on");
+                                btnServer.setText("Turning Server on");
                                 new Thread() {
                                         @Override
                                         public void run() {
@@ -1473,20 +1422,6 @@ public class UserInterface extends javax.swing.JFrame {
                 frameLogin.setVisible(true);
                 txtUserName.requestFocus();
         }//GEN-LAST:event_btnLogoutActionPerformed
-
-        private void btnSendActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSendActionPerformed
-                int choice = showOpenDialog();
-                File[] files = chooser.getSelectedFiles();
-                if (files.length < 1 || choice != JFileChooser.APPROVE_OPTION) {
-                        return;
-                }
-                try {
-                        File zipFile=getZipFile(files);
-                        Client.ClientClass sendFile=new Client.ClientClass("127.0.0.1",zipFile.getAbsolutePath());
-                } catch (Throwable th) {
-                        displayJOptionPane(th.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                }
-        }//GEN-LAST:event_btnSendActionPerformed
 
         private void panelCreateMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelCreateMouseDragged
                 Point currentCords = evt.getLocationOnScreen();
@@ -1517,6 +1452,20 @@ public class UserInterface extends javax.swing.JFrame {
                 compCords = null;
                 frameCords = null;
         }//GEN-LAST:event_panelMainMouseReleased
+
+    private void btnSendActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSendActionPerformed
+        if(btnSend.isSelected()){
+            btnSend.setText("Sending...");
+            new Thread(){
+                    @Override
+                    public void run(){
+                            startClient.start();
+                    }
+            }.start();
+        }else{
+            btnSend.setSelected(true);
+        }
+    }//GEN-LAST:event_btnSendActionPerformed
 
         /**
          * @param args the command line arguments
@@ -1565,8 +1514,8 @@ public class UserInterface extends javax.swing.JFrame {
         private javax.swing.JButton btnMinimize;
         private javax.swing.JButton btnMinimizeCreate;
         private javax.swing.JButton btnReplay;
-        private javax.swing.JButton btnSend;
-        private javax.swing.JToggleButton btnServer;
+        private javax.swing.JToggleButton btnSend;
+        public static javax.swing.JToggleButton btnServer;
         private javax.swing.JButton btnSlide;
         private javax.swing.JButton btnshowhide;
         private javax.swing.JFileChooser chooser;
