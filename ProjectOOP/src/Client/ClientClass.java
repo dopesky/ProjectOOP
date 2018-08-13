@@ -5,6 +5,7 @@
  */
 package Client;
 
+import ZipFiles.Zipper;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.IllegalBlockingModeException;
@@ -18,11 +19,10 @@ public class ClientClass {
         Socket socket, recepient;
         File transferFile, infoFile;
         int fileSize;
-        byte[] buffer;
         ServerSocket sendingServer;
         String server;
 
-        public ClientClass(String server, String file) throws IllegalBlockingModeException, IOException, UnknownHostException, SocketException, SecurityException, BindException, ConnectException, SocketTimeoutException {
+        public ClientClass(String server,String user, String file) throws IOException, UnknownHostException, SocketException{
                 this.server = server;
                 InetAddress serverAddress = InetAddress.getByName(server);
                 System.out.println("Connecting to server " + server + " on port 15132");
@@ -31,34 +31,36 @@ public class ClientClass {
                 transferFile = new File(file);
                 fileSize = (int) transferFile.length();
 
-                getInfoFile();
+                getInfoFile(user);
                 sendInfoFile();
                 sendFile();
         }
 
-        private void getInfoFile() throws IOException {
+        private void getInfoFile(String username) throws IOException {
                 System.out.println("Creating an Information file send.txt.");
                 infoFile = new File("send.txt");
 
-                PrintWriter sendTextWriter = new PrintWriter(infoFile);
-                sendTextWriter.write(String.valueOf(fileSize));
-                sendTextWriter.println();
-                sendTextWriter.write(transferFile.getName());
-                sendTextWriter.println();
-                sendTextWriter.write(Inet4Address.getLocalHost().getHostAddress());
-                sendTextWriter.println();
-                sendTextWriter.close();
+                try (PrintWriter sendTextWriter = new PrintWriter(infoFile)) {
+                        sendTextWriter.write(String.valueOf(fileSize));
+                        sendTextWriter.println();
+                        sendTextWriter.write(transferFile.getName());
+                        sendTextWriter.println();
+                        sendTextWriter.write(Inet4Address.getLocalHost().getHostAddress());
+                        sendTextWriter.println();
+                        sendTextWriter.write(username);
+                        sendTextWriter.println();
+                }
         }
 
         private void sendInfoFile() throws IOException, SocketException {
                 System.out.println("Reading info file (send.txt) into a byte array.");
-                buffer = new byte[(int) infoFile.length()];
+                Zipper.BUFFER = new byte[(int) infoFile.length()];
                 FileInputStream fin = new FileInputStream(infoFile);
                 BufferedInputStream bin = new BufferedInputStream(fin);
-                bin.read(buffer, 0, buffer.length);
+                bin.read(Zipper.BUFFER, 0, Zipper.BUFFER.length);
                 OutputStream os = socket.getOutputStream();
                 System.out.println("Sending Info file...");
-                os.write(buffer, 0, buffer.length);
+                os.write(Zipper.BUFFER, 0, Zipper.BUFFER.length);
                 os.flush();
                 socket.close();
                 fin.close();
@@ -83,14 +85,14 @@ public class ClientClass {
                                 sendLargeFiles();
                                 return;
                         }
-                        buffer = new byte[(int) transferFile.length()];
+                        Zipper.BUFFER = new byte[(int) transferFile.length()];
                         FileInputStream fin = new FileInputStream(transferFile);
                         BufferedInputStream bin = new BufferedInputStream(fin);
-                        int bytesRead=bin.read(buffer, 0, buffer.length);
+                        int bytesRead=bin.read(Zipper.BUFFER, 0, Zipper.BUFFER.length);
                         System.out.println(bytesRead+" bytes read from stream.");
                         OutputStream os = recepient.getOutputStream();
                         System.out.println("Preparing to Send File " + transferFile.getName() + " to " + server + "...");
-                        os.write(buffer, 0, Math.min(buffer.length,bytesRead));
+                        os.write(Zipper.BUFFER, 0, Math.min(Zipper.BUFFER.length,bytesRead));
                         os.flush();
                         recepient.close();
                         fin.close();
@@ -98,6 +100,7 @@ public class ClientClass {
                         sendingServer.close();
                         System.out.println("File transfer complete!!");
                         System.out.println("Thankyou");
+                        transferFile.delete();
                 } catch (SocketTimeoutException stoe) {
                         System.out.println("Recepient took too long to respond. Connection terminated.");
                 } catch (SocketException se) {
@@ -108,17 +111,17 @@ public class ClientClass {
         private void sendLargeFiles() throws IOException, IllegalBlockingModeException, SocketException {
                 int bytesRead;
                 sendingServer.setSoTimeout(0);
-                buffer = new byte[691000000];
+                Zipper.BUFFER = new byte[691000000];
                 FileInputStream fin = new FileInputStream(transferFile);
                 BufferedInputStream bin = new BufferedInputStream(fin);
                 OutputStream os = recepient.getOutputStream();
                 System.out.println("Preparing to Send File " + transferFile.getName() + " to " + server + "...");
 
                 do {
-                        bytesRead = bin.read(buffer, 0, buffer.length);
+                        bytesRead = bin.read(Zipper.BUFFER, 0, Zipper.BUFFER.length);
                         System.out.println(bytesRead + " bytes read.");
                         if (bytesRead > -1) {
-                                os.write(buffer, 0, bytesRead);
+                                os.write(Zipper.BUFFER, 0, bytesRead);
                         }
                 } while (bytesRead > -1);
                 os.flush();
@@ -126,6 +129,7 @@ public class ClientClass {
                 fin.close();
                 bin.close();
                 sendingServer.close();
+                transferFile.delete();
                 System.out.println("File transfer complete!!");
                 System.out.println("Thankyou");
         }

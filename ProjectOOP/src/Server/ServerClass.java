@@ -5,11 +5,12 @@
  */
 package Server;
 
+import GUI.UserInterface;
+import ZipFiles.Zipper;
 import com.bulenkov.darcula.DarculaLaf;
 import java.awt.*;
 import java.io.*;
 import java.net.*;
-import java.nio.channels.*;
 import java.util.*;
 import javax.swing.*;
 
@@ -22,12 +23,12 @@ public class ServerClass {
         /**
          * The server variable
          */
-        private ServerSocket socket;
+        private final ServerSocket socket;
 
         /**
-         * Socket to be used once the server accepts a connection
+         * Socket to be used once the server accepts a connection.
          */
-        private Socket client;
+        private final Socket client;
 
         /**
          * The default max size of file to receive ie 658MB per unit time.
@@ -36,7 +37,7 @@ public class ServerClass {
         int filesize = 691000000;
 
         /**
-         * variable to hold number of bytes read from the client side
+         * Variable to hold number of bytes read from the client side
          */
         int bytesRead;
 
@@ -45,11 +46,6 @@ public class ServerClass {
          * loop. Used to set the offset in the next loop.
          */
         int currentTot = 0;
-
-        /**
-         * Buffer to store data read from the input stream.
-         */
-        byte[] bytearray = new byte[1024];
 
         /**
          * An array to store information about the file being received
@@ -66,10 +62,12 @@ public class ServerClass {
         /**
          * The constructor.
          */
-        public ServerClass(int skip) throws IOException, SocketException, SecurityException, IllegalBlockingModeException, AWTException, BindException, ConnectException, Throwable {
-                 socket = new ServerSocket(15132);
+        public ServerClass(int skip) throws IOException, SocketException, AWTException {
+                UserInterface.btnServer.setText("Server is on");
+                socket = new ServerSocket(15132);
                 System.out.println("Waiting for connection... ");
                 client = socket.accept();
+                UserInterface.btnServer.setText("Server in use...");
                 System.out.println("Accepted connection : " + client);
                 receiveInfoByte();
                 readInfoByte();
@@ -96,11 +94,11 @@ public class ServerClass {
          */
         private void receiveInfoByte() throws IOException, SocketException {
                 InputStream is = client.getInputStream();
-                bytesRead = is.read(bytearray, 0, bytearray.length);
+                bytesRead = is.read(Zipper.BUFFER, 0, Zipper.BUFFER.length);
                 currentTot = bytesRead;
                 System.out.println("Receiving info byte.");
                 do {
-                        bytesRead = is.read(bytearray, currentTot, (bytearray.length - currentTot));
+                        bytesRead = is.read(Zipper.BUFFER, currentTot, (Zipper.BUFFER.length - currentTot));
                         if (bytesRead >= 0) {
                                 currentTot += bytesRead;
                         }
@@ -114,7 +112,7 @@ public class ServerClass {
                 FileOutputStream fos = new FileOutputStream("receive.txt");
                 BufferedOutputStream bos = new BufferedOutputStream(fos);
                 System.out.println("Reading info byte into temporary receive file.");
-                bos.write(bytearray, 0, currentTot);
+                bos.write(Zipper.BUFFER, 0, currentTot);
                 bos.flush();
                 bos.close();
                 fos.close();
@@ -128,21 +126,21 @@ public class ServerClass {
          */
         private void readInfoFile() throws IOException {
                 File tempFile = new File("receive.txt");
-                FileInputStream inputStream = new FileInputStream(tempFile);
-                Scanner temp = new Scanner(inputStream);
-                int rows;
-                for (rows = 0; temp.hasNext(); rows++) {
-                        temp.nextLine();
+                try (FileInputStream inputStream = new FileInputStream(tempFile)) {
+                        Scanner temp = new Scanner(inputStream);
+                        int rows;
+                        for (rows = 0; temp.hasNextLine(); rows++) {
+                                temp.nextLine();
+                        }
+                        System.out.println("Reading receive.txt file into fileData array.");
+                        fileData = new String[rows];
+                        
+                        temp = new Scanner(new FileInputStream("receive.txt"));
+                        for (int i = 0; i < fileData.length; i++) {
+                                fileData[i] = temp.nextLine();
+                        }
+                        temp.close();
                 }
-                System.out.println("Reading receive.txt file into fileData array.");
-                fileData = new String[rows];
-
-                temp = new Scanner(new FileInputStream("receive.txt"));
-                for (int i = 0; i < fileData.length; i++) {
-                        fileData[i] = temp.nextLine();
-                }
-                temp.close();
-                inputStream.close();
                 System.out.println("Deleting temporary file.");
                 tempFile.delete();
         }
@@ -158,7 +156,7 @@ public class ServerClass {
                 Notifications notify = new Notifications(imageIcon, "Accept the file being sent!");
                 notify.addActionListener();
                 notify.setPopupMenu();
-                notify.displayTray("File is Being Sent to you." , "Click me to receive file\n"+fileData[1]+" from\n"+fileData[2].trim(), TrayIcon.MessageType.INFO);
+                notify.displayTray("File is Being Sent to you." , "Click me to receive file from\n"+fileData[3].trim(), TrayIcon.MessageType.INFO);
 
                 new Thread() {
                         @Override
@@ -205,27 +203,27 @@ public class ServerClass {
                                 System.out.println("File Accepted.\nReceiving file...");
                                 int fileSize = Integer.parseInt(fileData[0].trim());
                                 if (fileSize > 691000000) {
-                                        return receiveLargeFiles(is, receiveInfo);
+                                        int temp= receiveLargeFiles(is, receiveInfo);
+                                        extractFiles();
+                                        return temp;
                                 }
-                                bytearray = new byte[filesize];
-                                bytesRead = is.read(bytearray, 0, bytearray.length);
+                                bytesRead = is.read(Zipper.BUFFER, 0, Zipper.BUFFER.length);
                                 currentTot = bytesRead;
                                 do {
-                                        bytesRead = is.read(bytearray, currentTot, (bytearray.length - currentTot));
+                                        bytesRead = is.read(Zipper.BUFFER, currentTot, (Zipper.BUFFER.length - currentTot));
                                         if (bytesRead >= 0) {
                                                 currentTot += bytesRead;
                                         }
                                         System.out.println(currentTot + " bytes read in total.");
                                 } while (bytesRead > -1);
 
-                                FileOutputStream fos = new FileOutputStream(fileData[1]);
-                                BufferedOutputStream bos = new BufferedOutputStream(fos);
-                                bos.write(bytearray, 0, currentTot);
-                                bos.flush();
-                                bos.close();
-                                fos.close();
+                                try (FileOutputStream fos = new FileOutputStream(fileData[1]); BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+                                        bos.write(Zipper.BUFFER, 0, currentTot);
+                                        bos.flush();
+                                }
                                 receiveInfo.close();
                                 System.out.println("File receipt complete.");
+                                extractFiles();
                                 return 0;
                         } else if (answer == 1) {
                                 System.out.println("File Rejected. Closing connection");
@@ -239,24 +237,29 @@ public class ServerClass {
         }
 
         private int receiveLargeFiles(InputStream socket, Socket receiver) throws IOException, SocketException {
-                FileOutputStream fos = new FileOutputStream(fileData[1]);
-                BufferedOutputStream bos = new BufferedOutputStream(fos);
-                bytearray = new byte[filesize];
-
-                do {
-                        bytesRead = socket.read(bytearray, 0, bytearray.length);
-                        currentTot += bytesRead;
-                        System.out.println(currentTot + " bytes read in total.");
-                        if (bytesRead > -1) {
-                                bos.write(bytearray, 0, bytesRead);
-                        }
-                } while (bytesRead > -1);
-                bos.flush();
-                bos.close();
-                fos.close();
+                try (FileOutputStream fos = new FileOutputStream(fileData[1]); BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+                        
+                        do {
+                                bytesRead = socket.read(Zipper.BUFFER, 0, Zipper.BUFFER.length);
+                                currentTot += bytesRead;
+                                System.out.println(currentTot + " bytes read in total.");
+                                if (bytesRead > -1) {
+                                        bos.write(Zipper.BUFFER, 0, bytesRead);
+                                }
+                        } while (bytesRead > -1);
+                        bos.flush();
+                }
                 receiver.close();
                 System.out.println("File receipt complete.");
                 return 0;
+        }
+        
+        private void extractFiles() throws IOException{
+                System.out.println("Beginning copying of files");
+                Zipper zipper=new Zipper(new File(fileData[1]));
+                System.out.println("Unzipping...");
+                zipper.unzip(fileData[3]);
+                System.out.println("It is finished. Check the default folder for your files.");
         }
 
         /**
