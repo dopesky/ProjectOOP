@@ -1193,9 +1193,6 @@
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="btnServerActionPerformed"/>
           </Events>
-          <AuxValues>
-            <AuxValue name="JavaCodeGenerator_VariableModifier" type="java.lang.Integer" value="9"/>
-          </AuxValues>
         </Component>
         <Component class="javax.swing.JToggleButton" name="btnBroadcast">
           <Properties>
@@ -1227,6 +1224,7 @@
               <Color blue="0" green="0" red="99" type="rgb"/>
             </Property>
             <Property name="text" type="java.lang.String" value="Send"/>
+            <Property name="focusable" type="boolean" value="false"/>
           </Properties>
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="btnSendActionPerformed"/>

@@ -7,6 +7,7 @@ package GUI;
 
 import AppPackage.AnimationClass;
 import Class.*;
+import Network.Network;
 import ZipFiles.Zipper;
 import com.bulenkov.darcula.*;
 import java.awt.*;
@@ -26,6 +27,29 @@ import javazoom.jl.player.*;
  */
 public class UserInterface extends javax.swing.JFrame {
 
+        Runnable runHook = new Runnable() {
+                @Override
+                public void run() {
+                        try {
+                                if (startClient.isAlive()) {
+                                        displayJOptionPane("Cannot Log Out or End Program at this time. File being Sent.", "Error", JOptionPane.ERROR_MESSAGE);
+                                        return;
+                                }
+                                database.execute("update users set loggedIn=0 where username='" + username + "'");
+                                if (process.isAlive()) {
+                                        process.destroy();
+                                }
+                        } catch (SQLException | NullPointerException sqle) {
+                                if (sqle instanceof SQLException) {
+                                        displayJOptionPane(sqle.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                                }
+                        }
+                        hook = new Thread(runHook);
+                }
+        };
+
+        Thread hook = new Thread(runHook);
+
         final AnimationClass anime = new AnimationClass();
         private boolean capsIsOn;
         private boolean fileNotFound = false;
@@ -41,18 +65,26 @@ public class UserInterface extends javax.swing.JFrame {
         Server.ServerClass server;
         private static int notifications = 1;
         private final String currentDir = "c:\\Users\\" + System.getProperty("user.name") + "\\Desktop";
-        private Process process=null;
+        private Process process = null;
+        private Network network = null;
 
         Runnable serverThread = new Runnable() {
                 @Override
                 public void run() {
                         try {
-                                ProcessBuilder builder = new ProcessBuilder(new String[]{"cmd.exe", "/c", "cd c:\\users\\"+System.getProperty("user.name")+"\\desktop\\javaapps\\projectoop\\projectoop\\build\\classes && java -cp c:\\users\\"+System.getProperty("user.name")+"\\desktop\\javaapps\\projectoop\\projectoop\\dist\\lib\\darcula.jar; Server.ServerClass " + notifications});
+                                ProcessBuilder builder = new ProcessBuilder(new String[]{"cmd.exe", "/c", "cd c:\\users\\" + System.getProperty("user.name") + "\\desktop\\javaapps\\projectoop\\projectoop\\build\\classes && java -cp c:\\users\\" + System.getProperty("user.name") + "\\desktop\\javaapps\\projectoop\\projectoop\\dist\\lib\\darcula.jar; Server.ServerClass " + notifications});
                                 builder.redirectErrorStream(true);
                                 process = builder.start();
                                 Scanner in = new Scanner(process.getInputStream());
                                 while (in.hasNextLine()) {
-                                        System.out.println(in.nextLine());
+                                        String temp = in.nextLine();
+                                        System.out.println(temp);
+                                        if (temp.toLowerCase().contains("accepted connection")) {
+                                                btnServer.setText("Server in use...");
+                                        }
+                                        if (temp.toLowerCase().contains("waiting for connection")) {
+                                                btnServer.setText("Server is on...");
+                                        }
                                 }
                         } catch (Throwable th) {
                                 displayJOptionPane(th.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -64,32 +96,33 @@ public class UserInterface extends javax.swing.JFrame {
         };
 
         Thread startServer = new Thread(serverThread);
-        
-        Runnable clientThread=new Runnable() {
-            @Override
-            public void run(){
-                int choice = showOpenDialog();
-                File[] files = chooser.getSelectedFiles();
-                if (files.length < 1 || choice != JFileChooser.APPROVE_OPTION) {
-                        return;
+
+        Runnable clientThread = new Runnable() {
+                @Override
+                public void run() {
+                        int choice = showOpenDialog();
+                        File[] files = chooser.getSelectedFiles();
+                        if (files.length < 1 || choice != JFileChooser.APPROVE_OPTION) {
+                                return;
+                        }
+                        try {
+                                Zipper zipper = new Zipper(files);
+                                Client.ClientClass sendFile = new Client.ClientClass("127.0.0.1", username, zipper.zipUp().getAbsolutePath());
+                        } catch (IOException | SecurityException | IllegalBlockingModeException th) {
+                                displayJOptionPane(th.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                        startClient = new Thread(clientThread);
                 }
-                try {
-                        Zipper zipper=new Zipper(files);
-                        Client.ClientClass sendFile=new Client.ClientClass("192.168.43.27",username,zipper.zipUp().getAbsolutePath());
-                } catch (IOException | SecurityException | IllegalBlockingModeException th) {
-                        displayJOptionPane(th.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                }
-                startClient=new Thread(clientThread);
-            }
         };
-        
-        Thread startClient=new Thread(clientThread);
+
+        Thread startClient = new Thread(clientThread);
 
         /**
          * Creates new form UserInterface
          */
         public UserInterface() {
                 connectToDatabase();
+                Runtime.getRuntime().addShutdownHook(hook);
                 ImageIcon icon = new ImageIcon(new ImageIcon(getClass().getResource("/Resources/lolo0073.png")).getImage());
                 initComponents();
 
@@ -133,12 +166,13 @@ public class UserInterface extends javax.swing.JFrame {
                                         break;
                                 }
                         }
-                } catch (Throwable th) {
+                } catch (ClassNotFoundException | IllegalAccessException | InstantiationException | UnsupportedLookAndFeelException th) {
                         database = new DBUtils("jdbc:mysql://localhost/filesharingoop", "root", "biggie5941");
                 }
                 if (!database.isConnectionSuccessful) {
                         System.exit(0);
                 }
+                network = new Network(database);
         }
 
         private void setInitialProperties() {
@@ -350,17 +384,6 @@ public class UserInterface extends javax.swing.JFrame {
                 } catch (SQLException sqle) {
                 }
                 return false;
-        }
-
-        private String getMacAddress() throws SocketException,UnknownHostException {
-                InetAddress localhost = InetAddress.getLocalHost();
-                NetworkInterface Interface = NetworkInterface.getByInetAddress(localhost);
-                byte[] mac = Interface.getHardwareAddress();
-                String macString = "";
-                for (int i = 0; i < mac.length; i++) {
-                        macString += String.format("%02X%s", mac[i], (i < mac.length - 1) ? "-" : "");
-                }
-                return macString;
         }
 
         private int showOpenDialog() {
@@ -1036,6 +1059,7 @@ public class UserInterface extends javax.swing.JFrame {
                 btnSend.setFont(new java.awt.Font("Palatino Linotype", 3, 16)); // NOI18N
                 btnSend.setForeground(new java.awt.Color(153, 0, 0));
                 btnSend.setText("Send");
+                btnSend.setFocusable(false);
                 btnSend.addActionListener(new java.awt.event.ActionListener() {
                         public void actionPerformed(java.awt.event.ActionEvent evt) {
                                 btnSendActionPerformed(evt);
@@ -1098,7 +1122,14 @@ public class UserInterface extends javax.swing.JFrame {
                         if (set.next()) {
                                 String temp = set.getObject(3).toString();
                                 if (temp.equals(password)) {
-//                                        database.execute("update users set macaddress='" + getMacAddress() + "' where username='" + username + "'");
+                                        if (set.getObject(4).toString().equals("1")) {
+                                                displayJOptionPane("User is already logged in. Cannot log in twice.", "Error", JOptionPane.ERROR_MESSAGE);
+                                                txtUserName.setText("");
+                                                txtPassword.setText("");
+                                                txtUserName.requestFocus();
+                                                return;
+                                        }
+                                        database.execute("update users set macaddress='" + network.getMacAddress((Inet4Address) InetAddress.getLocalHost()) + "',loggedIn=1 where username='" + username + "'");
                                         txtUserName.setText("");
                                         txtPassword.setText("");
                                         frameLogin.setVisible(false);
@@ -1119,6 +1150,7 @@ public class UserInterface extends javax.swing.JFrame {
                         System.exit(0);
                 } catch (Exception sqle) {
                         displayJOptionPane(sqle.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                        sqle.printStackTrace();
                 }
         }//GEN-LAST:event_btnLoginActionPerformed
 
@@ -1193,7 +1225,8 @@ public class UserInterface extends javax.swing.JFrame {
                         if (Desktop.isDesktopSupported()) {
                                 try {
                                         Desktop.getDesktop().browse(new URI("www.localhost/phpmyadmin/index.php"));
-                                } catch (IOException | URISyntaxException exe) {}
+                                } catch (IOException | URISyntaxException exe) {
+                                }
                         }
                 });
                 icon.show(btnIcon, 5, btnIcon.getHeight());
@@ -1314,9 +1347,8 @@ public class UserInterface extends javax.swing.JFrame {
                                 return;
                         }
                         try {
-                                String macAddress = getMacAddress();
                                 database.prepareStatement("insert into users(username,macaddress,password) values (?,?,?)");
-                                database.setObjects(new Object[]{user, macAddress, pass});
+                                database.setObjects(new Object[]{user, network.getMacAddress((Inet4Address) InetAddress.getLocalHost()), pass});
                                 database.executePst();
                                 displayJOptionPane("SUCCESS", "Information", JOptionPane.INFORMATION_MESSAGE);
                                 txtUname.setText("");
@@ -1418,9 +1450,22 @@ public class UserInterface extends javax.swing.JFrame {
         }//GEN-LAST:event_btnServerActionPerformed
 
         private void btnLogoutActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnLogoutActionPerformed
-                setVisible(false);
-                frameLogin.setVisible(true);
-                txtUserName.requestFocus();
+                try {
+                        hook.start();
+                        hook.join();
+                        btnServer.setSelected(false);
+                        btnServer.setText("Server is Off");
+                        btnBroadcast.setSelected(false);
+                        btnBroadcast.setText("Broadcast is Off");
+                        btnSend.setSelected(false);
+                        btnSend.setText("Send");
+                        setVisible(false);
+                        frameLogin.setVisible(true);
+                        txtUserName.requestFocus();
+                } catch (InterruptedException sqle) {
+                        displayJOptionPane(sqle.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                        System.exit(0);
+                }
         }//GEN-LAST:event_btnLogoutActionPerformed
 
         private void panelCreateMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panelCreateMouseDragged
@@ -1454,17 +1499,17 @@ public class UserInterface extends javax.swing.JFrame {
         }//GEN-LAST:event_panelMainMouseReleased
 
     private void btnSendActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSendActionPerformed
-        if(btnSend.isSelected()){
-            btnSend.setText("Sending...");
-            new Thread(){
-                    @Override
-                    public void run(){
-                            startClient.start();
-                    }
-            }.start();
-        }else{
-            btnSend.setSelected(true);
-        }
+            if (btnSend.isSelected()) {
+                    btnSend.setText("Sending...");
+                    new Thread() {
+                            @Override
+                            public void run() {
+                                    startClient.start();
+                            }
+                    }.start();
+            } else {
+                    btnSend.setSelected(true);
+            }
     }//GEN-LAST:event_btnSendActionPerformed
 
         /**
@@ -1515,7 +1560,7 @@ public class UserInterface extends javax.swing.JFrame {
         private javax.swing.JButton btnMinimizeCreate;
         private javax.swing.JButton btnReplay;
         private javax.swing.JToggleButton btnSend;
-        public static javax.swing.JToggleButton btnServer;
+        private javax.swing.JToggleButton btnServer;
         private javax.swing.JButton btnSlide;
         private javax.swing.JButton btnshowhide;
         private javax.swing.JFileChooser chooser;
