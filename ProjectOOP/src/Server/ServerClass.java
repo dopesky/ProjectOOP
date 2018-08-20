@@ -5,7 +5,6 @@
  */
 package Server;
 
-import GUI.UserInterface;
 import ZipFiles.Zipper;
 import com.bulenkov.darcula.DarculaLaf;
 import java.awt.*;
@@ -63,11 +62,9 @@ public class ServerClass {
          * The constructor.
          */
         public ServerClass(int skip) throws IOException, SocketException, AWTException {
-                UserInterface.btnServer.setText("Server is on");
                 socket = new ServerSocket(15132);
                 System.out.println("Waiting for connection... ");
                 client = socket.accept();
-                UserInterface.btnServer.setText("Server in use...");
                 System.out.println("Accepted connection : " + client);
                 receiveInfoByte();
                 readInfoByte();
