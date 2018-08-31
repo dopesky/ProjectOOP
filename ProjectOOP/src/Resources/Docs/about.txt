@@ -1,0 +1,32 @@
+This is a program that helps a viable company user or
+company admin connect to the system. The company has a 
+database designed by me which required the need for a 
+user friendly system to help the users of the database
+to connect to the database, retrieve information, delete
+unnecessary data, update information, input new data and
+other necessary operations as desired by the users.
+The system has been made user friendly to suite user needs.
+The company is a warehouse company which sells its goods
+to customers or other retailers. It deals with soft drinks
+from various other companies. Their database takes sales 
+and purchase information as well as information relating
+to other transactions and stores it. From here, the system
+can then be used to query the database and generate 
+information that can be used in desicion making by the 
+board of directors. 
+The system has a user login page that enables users to login
+into the system where they can do all sorts of operations.
+The database specifies a list of users who can access the 
+system along with their ranks. This list is used to counter
+check the given information to see if the user is viable or
+not. If the user is not viable, he/she cannot login into the
+system. A bunch of other buttons appear on th user login
+form and are pretty easy to use.
+All credits to Google, Stack Overflow, docs.Oracle site
+for all necessary information on coding and special thanks
+to my mother, Rose for her prayers, my dad, Festus for his
+support and relatives for believing in me, my friends for
+trusting i would manage, my beloved wife, Glory Nkatha 
+for always being by my side and lastly to the
+One and Only, God for everything.
+Designed by: Kevin Mwenda.
